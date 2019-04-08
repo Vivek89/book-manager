@@ -1,0 +1,16 @@
+server:
+  port: 9090
+generator:
+  top-of-book:
+    schedule: 0 0/10 * * * ?
+  new-order:
+    schedule: 0 0/1 * * * ?
+  modify-order:
+    schedule: 0 0/2 * * * ?
+  cancel-order:
+    schedule: 0 0/2 * * * ?
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
