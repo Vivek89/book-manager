@@ -21,7 +21,7 @@ import java.util.List;
 @RequestMapping(value = "/api/v1/", produces = MediaType.APPLICATION_JSON_VALUE)
 public class BookController {
 
-    private final AbstractBookService<Symbol, LevelDTO> service;
+    private final AbstractBookService<String, LevelDTO> service;
     private final OrderRepository orderRepository;
 
     @Autowired
@@ -46,7 +46,7 @@ public class BookController {
 
     @GetMapping("/levels/symbol/{symbol}")
     public LevelDTO getLevel(@PathVariable("symbol") String symbol) {
-        return service.applyStrategy(Symbol.valueOf(symbol));
+        return service.applyStrategy(symbol);
     }
 
 }

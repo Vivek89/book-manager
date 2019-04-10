@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.IdGenerator;
-import rx.subjects.PublishSubject;
+import rx.subjects.ReplaySubject;
 
 import javax.annotation.PostConstruct;
 import java.util.List;
@@ -28,26 +28,26 @@ public class GenearteQuotes {
     private final IdGenerator idGenerator;
     private final List<UUID> orderIdList;
     private final Random randomNumber;
-    private final PublishSubject<IModel> newOrderPublishSubject;
-    private final PublishSubject<IModel> modifyOrderPublishSubject;
-    private final PublishSubject<IModel> cancelOrderPublishSubject;
+    private final ReplaySubject<IModel> newOrderReplaySubject;
+    private final ReplaySubject<IModel> modifyOrderReplaySubject;
+    private final ReplaySubject<IModel> cancelOrderReplaySubject;
     private final OrderRepository orderRepository;
 
     @Autowired
     public GenearteQuotes(final IdGenerator idGenerator,
                           final List<UUID> orderIdList,
                           final Random randomNumber,
-                          @Qualifier("newOrderPublishSubject") final PublishSubject<IModel> newOrderPublishSubject,
-                          @Qualifier("modifyOrderPublishSubject") final PublishSubject<IModel> modifyOrderPublishSubject,
-                          @Qualifier("cancelOrderPublishSubject") final PublishSubject<IModel> cancelOrderPublishSubject,
+                          @Qualifier("newOrderReplaySubject") final ReplaySubject<IModel> newOrderReplaySubject,
+                          @Qualifier("modifyOrderReplaySubject") final ReplaySubject<IModel> modifyOrderReplaySubject,
+                          @Qualifier("cancelOrderReplaySubject") final ReplaySubject<IModel> cancelOrderReplaySubject,
                           final OrderRepository orderRepository) {
 
         this.idGenerator = idGenerator;
         this.orderIdList = orderIdList;
         this.randomNumber = randomNumber;
-        this.newOrderPublishSubject = newOrderPublishSubject;
-        this.modifyOrderPublishSubject = modifyOrderPublishSubject;
-        this.cancelOrderPublishSubject = cancelOrderPublishSubject;
+        this.newOrderReplaySubject = newOrderReplaySubject;
+        this.modifyOrderReplaySubject = modifyOrderReplaySubject;
+        this.cancelOrderReplaySubject = cancelOrderReplaySubject;
         this.orderRepository = orderRepository;
     }
 
@@ -91,7 +91,7 @@ public class GenearteQuotes {
                             Math.round(generateRandomBetween(100, 10000)),
                             null);
 
-                    this.newOrderPublishSubject.onNext(newOrder);
+                    this.newOrderReplaySubject.onNext(newOrder);
                     this.orderRepository.save(newOrder);
 //                    LOG.info(newOrder.toString());
                 });
@@ -118,7 +118,7 @@ public class GenearteQuotes {
                     newQuantity,
                     changeInQuantity);
 
-            this.modifyOrderPublishSubject.onNext(modifyOrder);
+            this.modifyOrderReplaySubject.onNext(modifyOrder);
             this.orderRepository.deleteById(id);
             this.orderRepository.save(modifyOrder);
 
@@ -141,7 +141,7 @@ public class GenearteQuotes {
                     null,
                     changeInQuantity);
 
-            this.cancelOrderPublishSubject.onNext(cancelOrder);
+            this.cancelOrderReplaySubject.onNext(cancelOrder);
             this.orderRepository.deleteById(id);
             LOG.info(cancelOrder.toString());
         }

@@ -6,7 +6,7 @@ import com.aqr.etf.book.model.OrderBook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
-import rx.subjects.PublishSubject;
+import rx.subjects.ReplaySubject;
 
 import javax.annotation.PostConstruct;
 import java.util.logging.Logger;
@@ -18,41 +18,44 @@ public class OrderProcessor implements ILoader {
     private final static Logger LOG =
             Logger.getLogger(OrderProcessor.class.getName());
 
-    private final PublishSubject<IModel> newOrderPublishSubject;
-    private final PublishSubject<IModel> modifyOrderPublishSubject;
-    private final PublishSubject<IModel> cancelOrderPublishSubject;
+    private final ReplaySubject<IModel> newOrderReplaySubject;
+    private final ReplaySubject<IModel> modifyOrderReplaySubject;
+    private final ReplaySubject<IModel> cancelOrderReplaySubject;
     private final OrderProcessorFacade orderProcessorFacade;
 
     @Autowired
     public OrderProcessor(
-            @Qualifier("newOrderPublishSubject")
-            final PublishSubject<IModel> newOrderPublishSubject,
-            @Qualifier("modifyOrderPublishSubject")
-            final PublishSubject<IModel> modifyOrderPublishSubject,
-            @Qualifier("cancelOrderPublishSubject")
-            final PublishSubject<IModel> cancelOrderPublishSubject,
+            @Qualifier("newOrderReplaySubject")
+            final ReplaySubject<IModel> newOrderReplaySubject,
+            @Qualifier("modifyOrderReplaySubject")
+            final ReplaySubject<IModel> modifyOrderReplaySubject,
+            @Qualifier("cancelOrderReplaySubject")
+            final ReplaySubject<IModel> cancelOrderReplaySubject,
             final OrderProcessorFacade orderProcessorFacade) {
 
-        this.newOrderPublishSubject     = newOrderPublishSubject;
-        this.modifyOrderPublishSubject  = modifyOrderPublishSubject;
-        this.cancelOrderPublishSubject  = cancelOrderPublishSubject;
+        this.newOrderReplaySubject     = newOrderReplaySubject;
+        this.modifyOrderReplaySubject  = modifyOrderReplaySubject;
+        this.cancelOrderReplaySubject  = cancelOrderReplaySubject;
         this.orderProcessorFacade       = orderProcessorFacade;
     }
 
     @PostConstruct
     public void processNewOrder() {
-        newOrderPublishSubject.subscribe(
+        newOrderReplaySubject.subscribe(
                 newOrder -> {
                     LOG.info("Start processing => "+ newOrder.toString());
-                    orderProcessorFacade.processNewOrder(newOrder);},
-                (Throwable ex) -> new OrderException("Error Processing New Order"),
-                () -> {}    // do nothing on completion
+                    orderProcessorFacade.processNewOrder(newOrder);} ,
+                (Throwable ex) -> {
+                    new OrderException("Error Processing New Order");
+                    LOG.warning(ex.getMessage());
+                }
+//                () -> {}    // do nothing on completion
         );
     }
 
     @PostConstruct
     public void processModifiedOrder() {
-        modifyOrderPublishSubject.subscribe(
+        modifyOrderReplaySubject.subscribe(
                 modifyOrder -> orderProcessorFacade.processModifiedOrder(modifyOrder),
                 (Throwable ex) -> new OrderException("Error Processing Modify Order"),
                 () -> {}
@@ -61,7 +64,7 @@ public class OrderProcessor implements ILoader {
 
     @PostConstruct
     public void processCancelOrder() {
-        cancelOrderPublishSubject.subscribe(
+        cancelOrderReplaySubject.subscribe(
                 cancelOrder -> orderProcessorFacade.processCancelOrder(cancelOrder),
                 (Throwable ex) -> new OrderException("Error Processing Cancel Order"),
                 () -> {}

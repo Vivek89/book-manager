@@ -1,21 +1,19 @@
 package com.aqr.etf.book.config;
 
 import com.aqr.etf.book.model.IModel;
-import com.aqr.etf.book.model.Symbol;
 import net.openhft.chronicle.map.ChronicleMapBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.IdGenerator;
 import org.springframework.util.SimpleIdGenerator;
-import org.springframework.web.reactive.function.server.RouterFunction;
-import org.springframework.web.reactive.function.server.ServerResponse;
-import rx.subjects.PublishSubject;
+import rx.subjects.ReplaySubject;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ConcurrentMap;
 
+import org.springframework.web.reactive.function.server.RouterFunction;
+import org.springframework.web.reactive.function.server.ServerResponse;
 import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
@@ -34,11 +32,11 @@ public class BookManagerConfig {
     }
 
     @Bean(name="buyMap")
-    public Map<Symbol, List> getBuyOffHeapMap() throws IOException {
+    public Map<String, List> getBuyOffHeapMap() throws IOException {
 
-        Map<Symbol, List> symbolMap =
-                ChronicleMapBuilder.of(Symbol.class, List.class)
-                        .entries(Symbol.values().length) //the maximum number of entries for the map
+        Map<String, List> symbolMap =
+                ChronicleMapBuilder.of(String.class, List.class)
+                        .entries(20) //the maximum number of entries for the map
                         .averageKeySize(32) //the average number of bytes for the key
                         .createPersistedTo(new File("/tmp",
                                 "symbolBuyMap"));
@@ -46,11 +44,11 @@ public class BookManagerConfig {
     }
 
     @Bean(name="sellMap")
-    public Map<Symbol, List> getSellOffHeapMap() throws IOException {
+    public Map<String, List> getSellOffHeapMap() throws IOException {
 
-        Map<Symbol, List> symbolMap =
-                ChronicleMapBuilder.of(Symbol.class, List.class)
-                        .entries(Symbol.values().length)
+        Map<String, List> symbolMap =
+                ChronicleMapBuilder.of(String.class, List.class)
+                        .entries(20)
                         .averageKeySize(32)
                         .createPersistedTo(new File("/tmp",
                                 "symbolSellMap"));
@@ -58,10 +56,10 @@ public class BookManagerConfig {
     }
 
     @Bean(name = "buyThresholdMap")
-    public Map<Symbol, Double> getBuyThresholdMap() throws IOException {
-        Map<Symbol, Double> symbolMap =
-                ChronicleMapBuilder.of(Symbol.class, Double.class)
-                        .entries(Symbol.values().length)
+    public Map<String, Double> getBuyThresholdMap() throws IOException {
+        Map<String, Double> symbolMap =
+                ChronicleMapBuilder.of(String.class, Double.class)
+                        .entries(20)
                         .averageKeySize(32)
                         .createPersistedTo(new File("/tmp",
                                 "symbolBuyThresholdMap"));
@@ -70,10 +68,10 @@ public class BookManagerConfig {
 
 
     @Bean(name = "sellThresholdMap")
-    public Map<Symbol, Double> getSellThresholdMap() throws IOException {
-        Map<Symbol, Double> symbolMap =
-                ChronicleMapBuilder.of(Symbol.class, Double.class)
-                        .entries(Symbol.values().length)
+    public Map<String, Double> getSellThresholdMap() throws IOException {
+        Map<String, Double> symbolMap =
+                ChronicleMapBuilder.of(String.class, Double.class)
+                        .entries(20)
                         .averageKeySize(32)
                         .createPersistedTo(new File("/tmp",
                                 "symbolSellThresholdMap"));
@@ -90,19 +88,19 @@ public class BookManagerConfig {
         return new Random();
     }
 
-    @Bean(name = "newOrderPublishSubject")
-    public PublishSubject<IModel> getNewOrderPublishSubject() {
-        return PublishSubject.create();
+    @Bean(name = "newOrderReplaySubject")
+    public ReplaySubject<IModel> getNewOrderReplaySubject() {
+        return ReplaySubject.create();
     }
 
-    @Bean(name = "modifyOrderPublishSubject")
-    public PublishSubject<IModel> getModifyOrderPublishSubject() {
-        return PublishSubject.create();
+    @Bean(name = "modifyOrderReplaySubject")
+    public ReplaySubject<IModel> getModifyOrderReplaySubject() {
+        return ReplaySubject.create();
     }
 
-    @Bean(name = "cancelOrderPublishSubject")
-    public PublishSubject<IModel> getCancelOrderPublishSubject() {
-        return PublishSubject.create();
+    @Bean(name = "cancelOrderReplaySubject")
+    public ReplaySubject<IModel> getCancelOrderReplaySubject() {
+        return ReplaySubject.create();
     }
 
 //    @Bean

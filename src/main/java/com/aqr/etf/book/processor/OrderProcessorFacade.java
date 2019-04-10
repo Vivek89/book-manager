@@ -19,20 +19,20 @@ public class OrderProcessorFacade {
     private final static Logger LOG =
             Logger.getLogger(OrderProcessorFacade.class.getName());
     private static final int LEVEL_SIZE = 5;
-    private final Map<Symbol, List> buyMap;
-    private final Map<Symbol, List> sellMap;
-    private final Map<Symbol, Double> buyThresholdPrice;
-    private final Map<Symbol, Double> sellThresholdPrice;
+    private final Map<String, List> buyMap;
+    private final Map<String, List> sellMap;
+    private final Map<String, Double> buyThresholdPrice;
+    private final Map<String, Double> sellThresholdPrice;
 
     @Autowired
     public OrderProcessorFacade(@Qualifier("buyMap")
-                                    final Map<Symbol, List> buyMap,
+                                    final Map<String, List> buyMap,
                                 @Qualifier("sellMap")
-                                final Map<Symbol, List> sellMap,
+                                final Map<String, List> sellMap,
                                 @Qualifier("buyThresholdMap")
-                                    final Map<Symbol, Double> buyThresholdPrice,
+                                    final Map<String, Double> buyThresholdPrice,
                                 @Qualifier("sellThresholdMap")
-                                    final Map<Symbol, Double> sellThresholdPrice) {
+                                    final Map<String, Double> sellThresholdPrice) {
         this.buyMap = buyMap;
         this.sellMap = sellMap;
         this.buyThresholdPrice = buyThresholdPrice;
@@ -47,13 +47,13 @@ public class OrderProcessorFacade {
         if (order.getSide() == Side.BUY) {
             LOG.info("Start Processing Facade: "+ order.toString());
 
-            List<OrderBook> buyList = buyMap.get(order.getSymbol());
+            List<OrderBook> buyList = buyMap.get(order.getSymbol().name());
 
             if (buyList == null) {
                 createNewOrderList(order);
                 return;
             } else if (buyList.size() < LEVEL_SIZE
-                    || order.getLimitPrice() >= buyThresholdPrice.get(order.getSymbol())) {
+                    || order.getLimitPrice() >= buyThresholdPrice.get(order.getSymbol().name())) {
                 updateNewOrderList(order);
                 return;
             } else return; // Do Nothing: These price are not in the Top 5 Levels
@@ -61,13 +61,13 @@ public class OrderProcessorFacade {
 
         // SELL SIDE
         else {
-            List<OrderBook> sellList = sellMap.get(order.getSymbol());
+            List<OrderBook> sellList = sellMap.get(order.getSymbol().name());
 
             if (sellList == null) {
                 createNewOrderList(order);
                 return;
             } else if (sellList.size() < LEVEL_SIZE
-                    || order.getLimitPrice() <= sellThresholdPrice.get(order.getSymbol())) {
+                    || order.getLimitPrice() <= sellThresholdPrice.get(order.getSymbol().name())) {
                 updateNewOrderList(order);
                 return;
             } else return; // Do Nothing: These price are not in the Top 5 Levels
@@ -83,12 +83,12 @@ public class OrderProcessorFacade {
         orderList.add(order);
 
         if(order.getSide() == Side.BUY) {
-            buyThresholdPrice.put(order.getSymbol(), order.getLimitPrice());
-            buyMap.put(order.getSymbol(), orderList);
+            buyThresholdPrice.put(order.getSymbol().name(), order.getLimitPrice());
+            buyMap.put(order.getSymbol().name(), orderList);
         }
         else {
-            sellThresholdPrice.put(order.getSymbol(), order.getLimitPrice());
-            sellMap.put(order.getSymbol(), orderList);
+            sellThresholdPrice.put(order.getSymbol().name(), order.getLimitPrice());
+            sellMap.put(order.getSymbol().name(), orderList);
         }
     }
 
@@ -98,9 +98,9 @@ public class OrderProcessorFacade {
         Double thresholdPrice;
 
         if(order.getSide() == Side.BUY) {
-            orderList = buyMap.get(order.getSymbol());
+            orderList = buyMap.get(order.getSymbol().name());
         } else {
-            orderList = sellMap.get(order.getSymbol());
+            orderList = sellMap.get(order.getSymbol().name());
         }
 
         // Find index of matching price
@@ -135,12 +135,12 @@ public class OrderProcessorFacade {
         // sort of direct retrieval and update Threshold and Map of Symbol:List<OrderBook>
         if(order.getSide() == Side.BUY) {
             Collections.sort(orderList);
-            buyThresholdPrice.put(order.getSymbol(), orderList.get(orderList.size()).getLimitPrice());
-            buyMap.put(order.getSymbol(), orderList);
+            buyThresholdPrice.put(order.getSymbol().name(), orderList.get(orderList.size()).getLimitPrice());
+            buyMap.put(order.getSymbol().name(), orderList);
         } else {
             Collections.sort(orderList, ascendingComparator);
-            sellThresholdPrice.put(order.getSymbol(), orderList.get(orderList.size()).getLimitPrice());
-            sellMap.put(order.getSymbol(), orderList);
+            sellThresholdPrice.put(order.getSymbol().name(), orderList.get(orderList.size()).getLimitPrice());
+            sellMap.put(order.getSymbol().name(), orderList);
         }
 
     }

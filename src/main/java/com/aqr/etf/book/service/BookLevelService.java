@@ -1,7 +1,6 @@
 package com.aqr.etf.book.service;
 
 import com.aqr.etf.book.model.OrderBook;
-import com.aqr.etf.book.model.Symbol;
 import com.aqr.etf.book.model.Valid;
 import com.aqr.etf.book.model.dto.Level;
 import com.aqr.etf.book.model.dto.LevelDTO;
@@ -15,34 +14,34 @@ import java.util.Map;
 import java.util.stream.IntStream;
 
 @Service("bookLevelService")
-public class BookLevelService extends AbstractBookService<Symbol, LevelDTO> {
+public class BookLevelService extends AbstractBookService<String, LevelDTO> {
 
-    private final Map<Symbol, List> buyMap;
-    private final Map<Symbol, List> sellMap;
+    private final Map<String, List> buyMap;
+    private final Map<String, List> sellMap;
 
     @Autowired
     public BookLevelService(@Qualifier("buyMap")
-                                final Map<Symbol, List> buyMap,
+                                final Map<String, List> buyMap,
                             @Qualifier("sellMap")
-                                final Map<Symbol, List> sellMap) {
+                                final Map<String, List> sellMap) {
         this.buyMap = buyMap;
         this.sellMap = sellMap;
     }
 
 
     @Override
-    Symbol preProcess(Symbol symbol) {
+    String preProcess(String symbol) {
         // Nothing to do here!
         return symbol;
     }
 
     @Override
-    Valid validate(Symbol symbol) {
+    Valid validate(String symbol) {
         return Valid.VALID;
     }
 
     @Override
-    LevelDTO compute(Symbol symbol) {
+    LevelDTO compute(String symbol) {
         List<OrderBook> buyLevels = buyMap.get(symbol);
         List<OrderBook> sellLevels = sellMap.get(symbol);
 
@@ -79,7 +78,7 @@ public class BookLevelService extends AbstractBookService<Symbol, LevelDTO> {
     }
 
     @Override
-    LevelDTO processError(Symbol r) {
+    LevelDTO processError(String r) {
         return null;
     }
 }
