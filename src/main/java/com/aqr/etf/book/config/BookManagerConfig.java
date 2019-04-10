@@ -19,6 +19,10 @@ import java.util.concurrent.ConcurrentMap;
 import static org.springframework.web.reactive.function.server.RequestPredicates.GET;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
 
+/**
+ * This class contains all the spring managed Beans.
+ * These beans will be used as global variables.
+ */
 @Configuration
 public class BookManagerConfig {
 
@@ -30,10 +34,10 @@ public class BookManagerConfig {
     }
 
     @Bean(name="buyMap")
-    public ConcurrentMap getBuyOffHeapMap() throws IOException {
+    public Map<Symbol, List> getBuyOffHeapMap() throws IOException {
 
-        ConcurrentMap<Symbol, PriorityQueue> symbolMap =
-                ChronicleMapBuilder.of(Symbol.class, PriorityQueue.class)
+        Map<Symbol, List> symbolMap =
+                ChronicleMapBuilder.of(Symbol.class, List.class)
                         .entries(Symbol.values().length) //the maximum number of entries for the map
                         .averageKeySize(32) //the average number of bytes for the key
                         .createPersistedTo(new File("/tmp",
@@ -42,14 +46,37 @@ public class BookManagerConfig {
     }
 
     @Bean(name="sellMap")
-    public ConcurrentMap getSellOffHeapMap() throws IOException {
+    public Map<Symbol, List> getSellOffHeapMap() throws IOException {
 
-        ConcurrentMap<Symbol, PriorityQueue> symbolMap =
-                ChronicleMapBuilder.of(Symbol.class, PriorityQueue.class)
-                        .entries(Symbol.values().length) //the maximum number of entries for the map
-                        .averageKeySize(32) //the average number of bytes for the key
+        Map<Symbol, List> symbolMap =
+                ChronicleMapBuilder.of(Symbol.class, List.class)
+                        .entries(Symbol.values().length)
+                        .averageKeySize(32)
                         .createPersistedTo(new File("/tmp",
                                 "symbolSellMap"));
+        return symbolMap;
+    }
+
+    @Bean(name = "buyThresholdMap")
+    public Map<Symbol, Double> getBuyThresholdMap() throws IOException {
+        Map<Symbol, Double> symbolMap =
+                ChronicleMapBuilder.of(Symbol.class, Double.class)
+                        .entries(Symbol.values().length)
+                        .averageKeySize(32)
+                        .createPersistedTo(new File("/tmp",
+                                "symbolBuyThresholdMap"));
+        return symbolMap;
+    }
+
+
+    @Bean(name = "sellThresholdMap")
+    public Map<Symbol, Double> getSellThresholdMap() throws IOException {
+        Map<Symbol, Double> symbolMap =
+                ChronicleMapBuilder.of(Symbol.class, Double.class)
+                        .entries(Symbol.values().length)
+                        .averageKeySize(32)
+                        .createPersistedTo(new File("/tmp",
+                                "symbolSellThresholdMap"));
         return symbolMap;
     }
 

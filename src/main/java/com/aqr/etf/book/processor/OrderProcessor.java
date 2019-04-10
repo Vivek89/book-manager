@@ -17,6 +17,7 @@ public class OrderProcessor implements ILoader {
 
     private final static Logger LOG =
             Logger.getLogger(OrderProcessor.class.getName());
+
     private final PublishSubject<IModel> newOrderPublishSubject;
     private final PublishSubject<IModel> modifyOrderPublishSubject;
     private final PublishSubject<IModel> cancelOrderPublishSubject;
@@ -42,6 +43,7 @@ public class OrderProcessor implements ILoader {
     public void processNewOrder() {
         newOrderPublishSubject.subscribe(
                 newOrder -> {
+                    LOG.info("Start processing => "+ newOrder.toString());
                     orderProcessorFacade.processNewOrder(newOrder);},
                 (Throwable ex) -> new OrderException("Error Processing New Order"),
                 () -> {}    // do nothing on completion

@@ -4,13 +4,17 @@ generator:
   top-of-book:
     schedule: 0 0/10 * * * ?
   new-order:
-    schedule: 0 0/1 * * * ?
+    schedule: 0/10 * * * * ?
   modify-order:
-    schedule: 0 0/2 * * * ?
+    schedule: 0/30 * * * * ?
   cancel-order:
-    schedule: 0 0/2 * * * ?
+    schedule: 0 0/1 * * * ?
 
 spring:
   jpa:
     hibernate:
       ddl-auto: update
+
+
+# Cron Scheduler Pattern
+#<second> <minute> <hour> <day-of-month> <month> <day-of-week> <year> <command>

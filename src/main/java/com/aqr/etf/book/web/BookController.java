@@ -1,11 +1,17 @@
 package com.aqr.etf.book.web;
 
 import com.aqr.etf.book.dao.OrderRepository;
-import com.aqr.etf.book.model.IModel;
 import com.aqr.etf.book.model.OrderBook;
+import com.aqr.etf.book.model.Side;
+import com.aqr.etf.book.model.Symbol;
+import com.aqr.etf.book.model.dto.LevelDTO;
+import com.aqr.etf.book.service.AbstractBookService;
+import com.aqr.etf.book.service.BookLevelService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -15,11 +21,15 @@ import java.util.List;
 @RequestMapping(value = "/api/v1/", produces = MediaType.APPLICATION_JSON_VALUE)
 public class BookController {
 
-    private OrderRepository orderRepository;
+    private final AbstractBookService<Symbol, LevelDTO> service;
+    private final OrderRepository orderRepository;
 
     @Autowired
-    public BookController(OrderRepository orderRepository) {
+    public BookController(final OrderRepository orderRepository,
+                          @Qualifier("bookLevelService")
+                            final BookLevelService service) {
         this.orderRepository = orderRepository;
+        this.service = service;
     }
 
     @GetMapping("/allNewOrder")
@@ -27,5 +37,16 @@ public class BookController {
         return (List<OrderBook>) orderRepository.findAll();
     }
 
+    @GetMapping("/symbol/{symbol}/side/{side}/price/{price}")
+    public List<OrderBook> getOrderForSymbolPrice(@PathVariable("symbol") String symbol,
+                                                  @PathVariable("side") String side,
+                                                  @PathVariable("price") Double price) {
+        return orderRepository.findBySymbolAndLimitPriceAndSide(Symbol.valueOf(symbol), price, Side.valueOf(side));
+    }
+
+    @GetMapping("/levels/symbol/{symbol}")
+    public LevelDTO getLevel(@PathVariable("symbol") String symbol) {
+        return service.applyStrategy(Symbol.valueOf(symbol));
+    }
 
 }

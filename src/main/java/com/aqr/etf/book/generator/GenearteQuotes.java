@@ -93,7 +93,7 @@ public class GenearteQuotes {
 
                     this.newOrderPublishSubject.onNext(newOrder);
                     this.orderRepository.save(newOrder);
-                    LOG.info(newOrder.toString());
+//                    LOG.info(newOrder.toString());
                 });
             });
         });

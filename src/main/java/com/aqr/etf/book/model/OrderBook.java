@@ -1,6 +1,7 @@
 package com.aqr.etf.book.model;
 
 import lombok.*;
+import org.jetbrains.annotations.NotNull;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -13,7 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Data
 @Entity(name = "order_book")
-public class OrderBook implements IModel {
+public class OrderBook implements IModel, Comparable<OrderBook> {
 
     @Id
     private UUID orderId;
@@ -22,4 +23,13 @@ public class OrderBook implements IModel {
     private Side side;
     private Long quantity;
     private Long changeInQuantity;
+
+    // Descending Compare
+    @Override
+    public int compareTo(@NotNull OrderBook o) {
+        if (this.limitPrice > o.limitPrice) {
+            return -1;
+        }
+        return 1;
+    }
 }
