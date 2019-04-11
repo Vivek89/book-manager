@@ -1,5 +1,6 @@
 package com.aqr.etf.book.processor;
 
+import com.aqr.etf.book.dao.OrderRepository;
 import com.aqr.etf.book.model.IModel;
 import com.aqr.etf.book.model.OrderBook;
 import com.aqr.etf.book.model.Side;
@@ -21,20 +22,23 @@ public class OrderProcessorFacade {
     private final Map<Symbol, List> sellMap;
     private final Map<Symbol, Double> buyThresholdPrice;
     private final Map<Symbol, Double> sellThresholdPrice;
+    private final OrderRepository orderRepository;
 
     @Autowired
     public OrderProcessorFacade(@Qualifier("buyMap")
                                     final Map<Symbol, List> buyMap,
                                 @Qualifier("sellMap")
-                                final Map<Symbol, List> sellMap,
+                                    final Map<Symbol, List> sellMap,
                                 @Qualifier("buyThresholdMap")
                                     final Map<Symbol, Double> buyThresholdPrice,
                                 @Qualifier("sellThresholdMap")
-                                    final Map<Symbol, Double> sellThresholdPrice) {
+                                    final Map<Symbol, Double> sellThresholdPrice,
+                                    final OrderRepository orderRepository) {
         this.buyMap = buyMap;
         this.sellMap = sellMap;
         this.buyThresholdPrice = buyThresholdPrice;
         this.sellThresholdPrice = sellThresholdPrice;
+        this.orderRepository = orderRepository;
     }
 
 
@@ -80,7 +84,99 @@ public class OrderProcessorFacade {
 
 
     public void processCancelOrder(IModel cancelOrder) {
+        OrderBook order = (OrderBook) cancelOrder;
+        updateCancelOrderList(order);
+    }
 
+    private void updateCancelOrderList(OrderBook order) {
+        List<OrderBook> orderList;
+        Double thresholdPrice;
+        if(order.getSide() == Side.BUY) {
+            orderList = buyMap.get(order.getSymbol());
+            thresholdPrice = buyThresholdPrice.get(order.getSymbol());
+
+            if(order.getLimitPrice() > thresholdPrice){
+                orderList = checkCancelOrderMatch(orderList, order);
+                Collections.sort(orderList);
+                buyThresholdPrice.put(order.getSymbol(),
+                        orderList.get(orderList.size() -1).getLimitPrice());
+                buyMap.put(order.getSymbol(), orderList);
+            }
+
+        } else {
+            orderList = sellMap.get(order.getSymbol());
+            thresholdPrice = sellThresholdPrice.get(order.getSymbol());
+
+            if (order.getLimitPrice() < thresholdPrice) {
+                orderList = checkCancelOrderMatch(orderList, order);
+                Collections.sort(orderList, ascendingComparator);
+                sellThresholdPrice.put(order.getSymbol(),
+                        orderList.get(orderList.size() -1).getLimitPrice());
+                sellMap.put(order.getSymbol(), orderList);
+            }
+        }
+    }
+
+
+    private List<OrderBook> checkCancelOrderMatch(List<OrderBook> orderList, OrderBook order) {
+        // Find index of matching price
+        OptionalInt index = IntStream.range(0, orderList.size())
+                .filter(i -> orderList.get(i).getLimitPrice().equals(order.getLimitPrice()))
+                .findFirst();
+
+        // If Matching Price Exist
+        if (index.isPresent()) {
+            OrderBook matchingPriceOrder = orderList.get(index.getAsInt());
+            Long updatedQuantity = order.getQuantity() + matchingPriceOrder.getQuantity();
+            if(updatedQuantity > 0) {
+                OrderBook aggPriceOrders = new OrderBook(order.getOrderId(),
+                        order.getSymbol(),
+                        order.getLimitPrice(),
+                        order.getSide(),
+                        order.getQuantity() + matchingPriceOrder.getQuantity(),
+                        null);
+
+                // replace order model with updated qty
+                log.info(String.format("Cancelling a Level %d %s order for %s",
+                        index.getAsInt(),
+                        order.getSide().name(),
+                        order.getSymbol().name()));
+                orderList.set(index.getAsInt(), aggPriceOrders);
+                return orderList;
+            } else {
+                // This means Cancellation has removed a level
+                // find next top price from DB and add to list
+                orderList.remove(index.getAsInt());
+                List<OrderBook> orders;
+
+                if(matchingPriceOrder.getSide() == Side.BUY) {
+                    orders = orderRepository.findNextLargerPrice(
+                            buyThresholdPrice.get(matchingPriceOrder.getSymbol()),
+                            matchingPriceOrder.getSymbol(),
+                            matchingPriceOrder.getSide()
+                    );
+                } else  {
+                    orders = orderRepository.findNextSmallerPrice(
+                            sellThresholdPrice.get(matchingPriceOrder.getSymbol()),
+                            matchingPriceOrder.getSymbol(),
+                            matchingPriceOrder.getSide()
+                    );
+                }
+                OrderBook aggPriceOrders = new OrderBook(
+                        order.getOrderId(),
+                        order.getSymbol(),
+                        order.getLimitPrice(),
+                        order.getSide(),
+                        orders.stream().reduce((acc, iter) -> {
+                            acc.setQuantity(acc.getQuantity() + iter.getQuantity());
+                            return acc;}).get().getQuantity(),
+                        null);
+
+                // now add this new price to order list
+                orderList.add(aggPriceOrders);
+                return orderList;
+            }
+        } else return orderList;    // Ideally this will never be reached
     }
 
 
@@ -217,7 +313,6 @@ public class OrderProcessorFacade {
             return orderList;
         }
     }
-
 
 
     // Ascending Compare
