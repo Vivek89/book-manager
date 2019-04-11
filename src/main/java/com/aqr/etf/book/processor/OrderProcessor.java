@@ -2,21 +2,17 @@ package com.aqr.etf.book.processor;
 
 import com.aqr.etf.book.exception.OrderException;
 import com.aqr.etf.book.model.IModel;
-import com.aqr.etf.book.model.OrderBook;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import rx.subjects.ReplaySubject;
 
 import javax.annotation.PostConstruct;
-import java.util.logging.Logger;
 
-
+@Log4j2
 @Component
 public class OrderProcessor implements ILoader {
-
-    private final static Logger LOG =
-            Logger.getLogger(OrderProcessor.class.getName());
 
     private final ReplaySubject<IModel> newOrderReplaySubject;
     private final ReplaySubject<IModel> modifyOrderReplaySubject;
@@ -43,13 +39,12 @@ public class OrderProcessor implements ILoader {
     public void processNewOrder() {
         newOrderReplaySubject.subscribe(
                 newOrder -> {
-                    LOG.info("Start processing => "+ newOrder.toString());
                     orderProcessorFacade.processNewOrder(newOrder);} ,
                 (Throwable ex) -> {
                     new OrderException("Error Processing New Order");
-                    LOG.warning(ex.getMessage());
+                    log.warn(ex.getMessage());
+                    ex.printStackTrace();
                 }
-//                () -> {}    // do nothing on completion
         );
     }
 
@@ -57,8 +52,11 @@ public class OrderProcessor implements ILoader {
     public void processModifiedOrder() {
         modifyOrderReplaySubject.subscribe(
                 modifyOrder -> orderProcessorFacade.processModifiedOrder(modifyOrder),
-                (Throwable ex) -> new OrderException("Error Processing Modify Order"),
-                () -> {}
+                (Throwable ex) -> {
+                    new OrderException("Error Processing Modify Order");
+                    log.warn(ex.getMessage());
+                    ex.printStackTrace();
+                }
         );
     }
 
@@ -66,8 +64,11 @@ public class OrderProcessor implements ILoader {
     public void processCancelOrder() {
         cancelOrderReplaySubject.subscribe(
                 cancelOrder -> orderProcessorFacade.processCancelOrder(cancelOrder),
-                (Throwable ex) -> new OrderException("Error Processing Cancel Order"),
-                () -> {}
+                (Throwable ex) -> {
+                    new OrderException("Error Processing Cancel Order");
+                    log.warn(ex.getMessage());
+                    ex.printStackTrace();
+                }
         );
     }
 }

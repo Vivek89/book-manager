@@ -4,35 +4,33 @@ import com.aqr.etf.book.model.IModel;
 import com.aqr.etf.book.model.OrderBook;
 import com.aqr.etf.book.model.Side;
 import com.aqr.etf.book.model.Symbol;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Logger;
 import java.util.stream.IntStream;
 
+@Log4j2
 @Component
 public class OrderProcessorFacade {
 
-    private final static Logger LOG =
-            Logger.getLogger(OrderProcessorFacade.class.getName());
     private static final int LEVEL_SIZE = 5;
-    private final Map<String, List> buyMap;
-    private final Map<String, List> sellMap;
-    private final Map<String, Double> buyThresholdPrice;
-    private final Map<String, Double> sellThresholdPrice;
+    private final Map<Symbol, List> buyMap;
+    private final Map<Symbol, List> sellMap;
+    private final Map<Symbol, Double> buyThresholdPrice;
+    private final Map<Symbol, Double> sellThresholdPrice;
 
     @Autowired
     public OrderProcessorFacade(@Qualifier("buyMap")
-                                    final Map<String, List> buyMap,
+                                    final Map<Symbol, List> buyMap,
                                 @Qualifier("sellMap")
-                                final Map<String, List> sellMap,
+                                final Map<Symbol, List> sellMap,
                                 @Qualifier("buyThresholdMap")
-                                    final Map<String, Double> buyThresholdPrice,
+                                    final Map<Symbol, Double> buyThresholdPrice,
                                 @Qualifier("sellThresholdMap")
-                                    final Map<String, Double> sellThresholdPrice) {
+                                    final Map<Symbol, Double> sellThresholdPrice) {
         this.buyMap = buyMap;
         this.sellMap = sellMap;
         this.buyThresholdPrice = buyThresholdPrice;
@@ -45,15 +43,14 @@ public class OrderProcessorFacade {
 
         // BUY SIDE
         if (order.getSide() == Side.BUY) {
-            LOG.info("Start Processing Facade: "+ order.toString());
 
-            List<OrderBook> buyList = buyMap.get(order.getSymbol().name());
+            List<OrderBook> buyList = buyMap.get(order.getSymbol());
 
             if (buyList == null) {
                 createNewOrderList(order);
                 return;
             } else if (buyList.size() < LEVEL_SIZE
-                    || order.getLimitPrice() >= buyThresholdPrice.get(order.getSymbol().name())) {
+                    || order.getLimitPrice() >= buyThresholdPrice.get(order.getSymbol())) {
                 updateNewOrderList(order);
                 return;
             } else return; // Do Nothing: These price are not in the Top 5 Levels
@@ -61,13 +58,13 @@ public class OrderProcessorFacade {
 
         // SELL SIDE
         else {
-            List<OrderBook> sellList = sellMap.get(order.getSymbol().name());
+            List<OrderBook> sellList = sellMap.get(order.getSymbol());
 
             if (sellList == null) {
                 createNewOrderList(order);
                 return;
             } else if (sellList.size() < LEVEL_SIZE
-                    || order.getLimitPrice() <= sellThresholdPrice.get(order.getSymbol().name())) {
+                    || order.getLimitPrice() <= sellThresholdPrice.get(order.getSymbol())) {
                 updateNewOrderList(order);
                 return;
             } else return; // Do Nothing: These price are not in the Top 5 Levels
@@ -76,40 +73,51 @@ public class OrderProcessorFacade {
     }
 
 
+    public void processModifiedOrder(IModel modifyOrder) {
+        OrderBook order = (OrderBook) modifyOrder;
+        updateModifyOrderList(order);
+    }
+
+
+    public void processCancelOrder(IModel cancelOrder) {
+
+    }
+
+
     private void createNewOrderList(OrderBook order) {
         List<OrderBook> orderList;
-        orderList = new ArrayList<>();
+        orderList = new ArrayList<>(LEVEL_SIZE);
 
         orderList.add(order);
 
         if(order.getSide() == Side.BUY) {
-            buyThresholdPrice.put(order.getSymbol().name(), order.getLimitPrice());
-            buyMap.put(order.getSymbol().name(), orderList);
+            buyThresholdPrice.put(order.getSymbol(), order.getLimitPrice());
+            buyMap.put(order.getSymbol(), orderList);
         }
         else {
-            sellThresholdPrice.put(order.getSymbol().name(), order.getLimitPrice());
-            sellMap.put(order.getSymbol().name(), orderList);
+            sellThresholdPrice.put(order.getSymbol(), order.getLimitPrice());
+            sellMap.put(order.getSymbol(), orderList);
         }
     }
 
 
     private void updateNewOrderList(OrderBook order) {
         List<OrderBook> orderList;
-        Double thresholdPrice;
 
         if(order.getSide() == Side.BUY) {
-            orderList = buyMap.get(order.getSymbol().name());
+            orderList = buyMap.get(order.getSymbol());
         } else {
-            orderList = sellMap.get(order.getSymbol().name());
+            orderList = sellMap.get(order.getSymbol());
         }
 
         // Find index of matching price
         OptionalInt index = IntStream.range(0, orderList.size())
-                .filter(i -> orderList.get(i).getLimitPrice() == order.getLimitPrice())
+                .filter(i -> orderList.get(i).getLimitPrice().equals(order.getLimitPrice()))
                 .findFirst();
 
         // If Matching Price Exist
         if (index.isPresent()) {
+
             OrderBook matchingPriceOrder = orderList.get(index.getAsInt());
             OrderBook aggPriceOrders = new OrderBook(order.getOrderId(),
                     order.getSymbol(),
@@ -119,8 +127,11 @@ public class OrderProcessorFacade {
                     null);
 
             // replace order model with updated qty
-            LOG.info(String.format("Updating a Level {} order", index.getAsInt()));
-            orderList.add(index.getAsInt(), aggPriceOrders);
+            log.info(String.format("Updating a Level %d %s order for %s",
+                    index.getAsInt(),
+                    order.getSide().name(),
+                    order.getSymbol().name()));
+            orderList.set(index.getAsInt(), aggPriceOrders);
 
         } else {
             // otherwise just add new order to list
@@ -128,35 +139,89 @@ public class OrderProcessorFacade {
                 orderList.add(order);
             } else {
                 // Add new order at last index, to remove the old Level-4
-                orderList.add(LEVEL_SIZE - 1, order);
+                orderList.set(LEVEL_SIZE - 1, order);
             }
         }
 
         // sort of direct retrieval and update Threshold and Map of Symbol:List<OrderBook>
         if(order.getSide() == Side.BUY) {
             Collections.sort(orderList);
-            buyThresholdPrice.put(order.getSymbol().name(), orderList.get(orderList.size()).getLimitPrice());
-            buyMap.put(order.getSymbol().name(), orderList);
+            buyThresholdPrice.put(order.getSymbol(),
+                    orderList.get(orderList.size() -1).getLimitPrice());
+            buyMap.put(order.getSymbol(), orderList);
         } else {
             Collections.sort(orderList, ascendingComparator);
-            sellThresholdPrice.put(order.getSymbol().name(), orderList.get(orderList.size()).getLimitPrice());
-            sellMap.put(order.getSymbol().name(), orderList);
+            sellThresholdPrice.put(order.getSymbol(),
+                    orderList.get(orderList.size() -1).getLimitPrice());
+            sellMap.put(order.getSymbol(), orderList);
         }
-
     }
 
 
+    private void updateModifyOrderList(OrderBook order) {
+        List<OrderBook> orderList;
+        Double thresholdPrice;
+        if(order.getSide() == Side.BUY) {
+            orderList = buyMap.get(order.getSymbol());
+            thresholdPrice = buyThresholdPrice.get(order.getSymbol());
 
-    public void processModifiedOrder(IModel modifyOrder) {
+            if(order.getLimitPrice() > thresholdPrice) {
+                orderList = checkModifyOrderMatch(orderList, order);
+                Collections.sort(orderList);
+                buyThresholdPrice.put(order.getSymbol(),
+                        orderList.get(orderList.size() -1).getLimitPrice());
+                buyMap.put(order.getSymbol(), orderList);
+            }
+        } else {
+            orderList = sellMap.get(order.getSymbol());
+            thresholdPrice = sellThresholdPrice.get(order.getSymbol());
 
+            if(order.getLimitPrice() < thresholdPrice) {
+                orderList = checkModifyOrderMatch(orderList, order);
+                Collections.sort(orderList, ascendingComparator);
+                sellThresholdPrice.put(order.getSymbol(),
+                        orderList.get(orderList.size() -1).getLimitPrice());
+                sellMap.put(order.getSymbol(), orderList);
+            }
+        }
     }
 
-    public void processCancelOrder(IModel cancelOrder) {
+    public List<OrderBook>  checkModifyOrderMatch(List<OrderBook> orderList, OrderBook order) {
+        // Find index of matching price
+        OptionalInt index = IntStream.range(0, orderList.size())
+                .filter(i -> orderList.get(i).getLimitPrice().equals(order.getLimitPrice()))
+                .findFirst();
 
+        // If Matching Price Exist
+        if (index.isPresent()) {
+
+            OrderBook matchingPriceOrder = orderList.get(index.getAsInt());
+            OrderBook aggPriceOrders = new OrderBook(order.getOrderId(),
+                    order.getSymbol(),
+                    order.getLimitPrice(),
+                    order.getSide(),
+                    order.getChangeInQuantity() + matchingPriceOrder.getQuantity(),
+                    null);
+
+            // replace order model with updated qty
+            log.info(String.format("Modifying a Level %d %s order for %s",
+                    index.getAsInt(),
+                    order.getSide().name(),
+                    order.getSymbol().name()));
+            orderList.set(index.getAsInt(), aggPriceOrders);
+            return orderList;
+
+        } else {
+            // Update the order at last element in the list
+            orderList.set(LEVEL_SIZE - 1, order);
+            return orderList;
+        }
     }
+
+
 
     // Ascending Compare
-    Comparator<OrderBook> ascendingComparator = (o1, o2) -> {
+    private Comparator<OrderBook> ascendingComparator = (o1, o2) -> {
         if (o1.getLimitPrice() > o2.getLimitPrice())
             return 1;
         else return -1;

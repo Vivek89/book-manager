@@ -4,11 +4,11 @@ generator:
   top-of-book:
     schedule: 0 0/10 * * * ?
   new-order:
-    schedule: 0/10 * * * * ?
+    schedule: 0/5 * * * * ?
   modify-order:
-    schedule: 0/30 * * * * ?
+    schedule: 0/15 * * * * ?
   cancel-order:
-    schedule: 0 0/1 * * * ?
+    schedule: 0/30 * * * * ?
 
 spring:
   jpa:

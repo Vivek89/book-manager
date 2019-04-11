@@ -2,6 +2,7 @@ package com.aqr.etf.book.generator;
 
 import com.aqr.etf.book.dao.OrderRepository;
 import com.aqr.etf.book.model.*;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -15,15 +16,21 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
+
+/**
+ * This is a sample class that mimics tickers coming from different exchanges.
+ * Observer Pattern using RXJava ReplaySubject: Once the tickers are generated,
+ *          they are put to a subject, which is observed by application processor.
+ * This is also responsible for persisting Model - OrderModel into in-memory DB.
+ * DB used: Apache Derby
+ * Persistence used: Spring JPA
+ */
 @Component
 @EnableScheduling
+@Log4j2
 public class GenearteQuotes {
-
-    private final static Logger LOG =
-            Logger.getLogger(GenearteQuotes.class.getName());
 
     private final IdGenerator idGenerator;
     private final List<UUID> orderIdList;
@@ -67,7 +74,7 @@ public class GenearteQuotes {
                             generateRandomBetween(sym.getIndex(), sym.getIndex() + 2),
                             Math.round(generateRandomBetween(100, 1000)));
 
-                    LOG.info(topBook.toString());
+                    log.info(topBook.toString());
                 });
             });
         });
@@ -93,7 +100,7 @@ public class GenearteQuotes {
 
                     this.newOrderReplaySubject.onNext(newOrder);
                     this.orderRepository.save(newOrder);
-//                    LOG.info(newOrder.toString());
+//                    log.info(newOrder.toString());
                 });
             });
         });
@@ -103,26 +110,28 @@ public class GenearteQuotes {
     @Scheduled(cron = "${generator.modify-order.schedule}")
     public void generateModifyOrder() {
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 20; i++) {
 
             UUID id = orderIdList.get(randomNumber.nextInt(orderIdList.size()));
             Optional<OrderBook> order = this.orderRepository.findById(id);
             Long newQuantity = Math.round(generateRandomBetween(100, 10000));
             Long changeInQuantity = order.isPresent()? newQuantity - order.get().getQuantity() : null;
 
-            OrderBook modifyOrder = new OrderBook(
-                    id,
-                    null,
-                    null,
-                    null,
-                    newQuantity,
-                    changeInQuantity);
+            Optional<OrderBook> checkOrder = this.orderRepository.findById(id);
+            if (checkOrder.isPresent()) {
+                OrderBook modifyOrder = new OrderBook(
+                        id,
+                        checkOrder.get().getSymbol(),
+                        checkOrder.get().getLimitPrice(),
+                        checkOrder.get().getSide(),
+                        newQuantity,
+                        changeInQuantity);
+                this.modifyOrderReplaySubject.onNext(modifyOrder);
+                this.orderRepository.deleteById(id);
+                this.orderRepository.save(modifyOrder);
+//                log.info(modifyOrder.toString() + " - ID: " + modifyOrder.getOrderId());
+            }
 
-            this.modifyOrderReplaySubject.onNext(modifyOrder);
-            this.orderRepository.deleteById(id);
-            this.orderRepository.save(modifyOrder);
-
-            LOG.info(modifyOrder.toString() + " - ID: " + modifyOrder.getOrderId());
         }
     }
 
@@ -133,17 +142,22 @@ public class GenearteQuotes {
             UUID id = orderIdList.get(randomNumber.nextInt(orderIdList.size()));
             Optional<OrderBook> order = this.orderRepository.findById(id);
             Long changeInQuantity = order.isPresent()? - order.get().getQuantity() : null;
-            OrderBook cancelOrder = new OrderBook(
-                    id,
-                    null,
-                    null,
-                    null,
-                    null,
-                    changeInQuantity);
 
-            this.cancelOrderReplaySubject.onNext(cancelOrder);
-            this.orderRepository.deleteById(id);
-            LOG.info(cancelOrder.toString());
+            Optional<OrderBook> checkOrder = this.orderRepository.findById(id);
+            if (checkOrder.isPresent()) {
+                OrderBook cancelOrder = new OrderBook(
+                        id,
+                        checkOrder.get().getSymbol(),
+                        checkOrder.get().getLimitPrice(),
+                        checkOrder.get().getSide(),
+                        checkOrder.get().getQuantity(),
+                        changeInQuantity);
+
+                this.cancelOrderReplaySubject.onNext(cancelOrder);
+                this.orderRepository.deleteById(id);
+//                log.info(cancelOrder.toString());
+            }
+
         }
     }
 

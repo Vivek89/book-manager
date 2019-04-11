@@ -1,10 +1,10 @@
 package com.aqr.etf.book.model;
 
 import lombok.*;
-import org.jetbrains.annotations.NotNull;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.validation.constraints.NotNull;
 import java.util.UUID;
 
 @Getter
@@ -22,6 +22,8 @@ public class OrderBook implements IModel, Comparable<OrderBook> {
     private Double limitPrice;
     private Side side;
     private Long quantity;
+
+    // delta change in the order-id for modify and cancellation
     private Long changeInQuantity;
 
     // Descending Compare

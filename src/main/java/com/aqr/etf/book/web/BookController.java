@@ -16,12 +16,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping(value = "/api/v1/", produces = MediaType.APPLICATION_JSON_VALUE)
 public class BookController {
 
-    private final AbstractBookService<String, LevelDTO> service;
+    private final AbstractBookService<Symbol, LevelDTO> service;
     private final OrderRepository orderRepository;
 
     @Autowired
@@ -44,9 +45,22 @@ public class BookController {
         return orderRepository.findBySymbolAndLimitPriceAndSide(Symbol.valueOf(symbol), price, Side.valueOf(side));
     }
 
+    @GetMapping("/symbol/{symbol}")
+    public List<OrderBook> getOrderForSymbol(@PathVariable("symbol") String symbol) {
+        return orderRepository.findBySymbol(Symbol.valueOf(symbol));
+    }
+
     @GetMapping("/levels/symbol/{symbol}")
     public LevelDTO getLevel(@PathVariable("symbol") String symbol) {
-        return service.applyStrategy(symbol);
+        return service.applyStrategy(Symbol.valueOf(symbol));
+    }
+
+    @GetMapping("/otherPrices/symbol/{symbol}/side/{side}/threshold/{price}")
+    public List<OrderBook> otherPrice(@PathVariable("symbol") String symbol,
+                                      @PathVariable("side") String side,
+                                      @PathVariable("price") Double price) {
+        return orderRepository.findNextSmallerPrice(price, Symbol.valueOf(symbol), Side.valueOf(side));
+
     }
 
 }
